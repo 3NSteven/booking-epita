@@ -26,19 +26,42 @@ public class SecurityConfiguration {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        return http
+        http
             .authorizeHttpRequests(auth -> auth
                 // Step 3: add authorization
+                .requestMatchers("/dashboard").hasRole("ADMIN")
+                .requestMatchers("/booking").permitAll()
                 .anyRequest().permitAll()
             )
             // Step 3: Add login form
             .csrf((csrf) -> csrf
                 .ignoringRequestMatchers("/h2-console/*")
             )
-            .headers(headers -> headers.frameOptions().disable())
-            .build();
+            .headers(headers -> headers
+                .frameOptions(frameOptions -> frameOptions.sameOrigin())
+            )
+            .formLogin(withDefaults())
+            .logout(withDefaults());
+
+        return http.build();
     }
 
     // Step 3: add InMemoryUserDetailsManager
+    @Bean
+    public UserDetailsService users() {
+        UserDetails admin = User.builder()
+            .username("admin")
+            .password("{bcrypt}$2a$10$bgM3LpD8FDw/wSFsy97h9OoM2.xNEznh6DOsStjng.99hcr91Rc6.")
+            .roles("ADMIN")
+            .build();
+
+        UserDetails user = User.builder()
+            .username("user")
+            .password("{bcrypt}$2a$10$S/eEazGrUdsfWqNem7V1Menpycs8lJrzLUCBlIXlu8.TR.5ai5MBW")
+            .roles("USER")
+            .build();
+
+        return new InMemoryUserDetailsManager(admin, user);
+    }
 
 }
