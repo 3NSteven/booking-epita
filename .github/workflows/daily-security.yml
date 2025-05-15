@@ -1,44 +1,54 @@
-name: Daily Security Pipeline
+name: Daily and PR Security Pipeline
 
 on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  security-events: write
+  contents: read
 
 jobs:
-  dependencies-analysis:
+  osv_scan:
+    name: Run OSV Scanner
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v3
-
-      - name: Download osv-scanner
-        run: |
-          curl -LO https://github.com/google/osv-scanner/releases/download/v1.7.3/osv-scanner_1.7.3_linux_amd64.tar.gz
-          tar -xvzf osv-scanner_1.7.3_linux_amd64.tar.gz
-          sudo mv osv-scanner /usr/local/bin/
-
-      - name: Run osv-scanner
-        run: |
-          osv-scanner --lockfile=app/gradle.lockfile --format sarif > osv.sarif
-
-      - name: Upload SARIF report
-        uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: osv.sarif
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-  sourcecode-analysis:
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action/osv-scanner-action
+        with:
+          output: osv-report.sarif
+
+      - name: Upload OSV SARIF report to Security Dashboard
+        uses: github/codeql-action/upload-sarif
+        with:
+          sarif_file: osv-report.sarif
+
+  semgrep_scan:
+    name: Run Semgrep Analysis
     runs-on: ubuntu-latest
     container:
-      image: returntocorp/semgrep
+      image: returntocorp/semgrep:latest
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Run Semgrep analysis
-        run: semgrep --config=p/java --sarif --output=semgrep.sarif .
-
-      - name: Upload SARIF report
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Check out repository
+        uses: actions/checkout@v3
         with:
-          sarif_file: semgrep.sarif
+          token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Run Semgrep for Java ruleset
+        run: |
+          semgrep --config p/java --sarif --output semgrep-report.sarif
+
+      - name: Upload Semgrep SARIF report to Security Dashboard
+        uses: github/codeql-action/upload-sarif
+        with:
+          sarif_file: semgrep-report.sarif
