@@ -2,54 +2,35 @@ name: Daily Security Pipeline
 
 on:
   schedule:
-    - cron: '0 1 * * *'  # Tous les jours à 01h00 UTC
-  workflow_dispatch:      # Exécution manuelle possible
-
-permissions:
-  contents: read
-  security-events: write  # Requis pour publier SARIF
+    - cron: '0 0 * * *'  # Tous les jours à minuit
+  workflow_dispatch:
 
 jobs:
-  DependenciesAnalysis:
-    name: Analyse Semgrep (Java)
+  dependencies-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action@v1
+
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: osv.sarif
+
+  sourcecode-analysis:
     runs-on: ubuntu-latest
     container:
       image: returntocorp/semgrep
     steps:
-      - name: Checkout du code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Lancer Semgrep
-        run: semgrep --config=p/java --sarif --output=semgrep-report.sarif
+      - name: Run Semgrep analysis
+        run: semgrep --config=p/java --sarif --output=semgrep.sarif .
 
-      - name: Envoyer le rapport SARIF
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: semgrep-report.sarif
-
-  SourceCodeAnalysis:
-    name: Analyse OSV Scanner
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout du code
-        uses: actions/checkout@v3
-
-      - name: Télécharger OSV-Scanner
-        run: |
-          curl -sSfL https://github.com/google/osv-scanner/releases/download/v1.7.3/osv-scanner_1.7.3_linux_amd64.tar.gz -o osv-scanner.tar.gz
-          tar -xzf osv-scanner.tar.gz
-          chmod +x osv-scanner
-          sudo mv osv-scanner /usr/local/bin/
-
-      - name: Lancer OSV-Scanner
-        run: |
-          osv-scanner --recursive . --format sarif --output osv-report.sarif || echo "OSV scan terminé"
-
-      - name: Vérification présence SARIF
-        run: ls -l osv-report.sarif || echo "SARIF non généré"
-
-      - name: Envoyer le rapport SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: osv-report.sarif
+          sarif_file: semgrep.sarif
 
