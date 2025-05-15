@@ -2,8 +2,8 @@ name: Daily Security Pipeline
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # tous les jours à 3h00 UTC
-  workflow_dispatch:      # pour le test manuel
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,21 +12,25 @@ permissions:
 jobs:
 
   SourceCodeAnalysis:
-    name: Analyse des dépendances (OSV)
+    name: Analyse des dépendances (OSV Scanner)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Exécuter OSV Scanner
-        uses: google/osv-scanner-action@v1
-        with:
-          scan-args: '.'
+      - name: Installer OSV Scanner
+        run: |
+          curl -LO https://github.com/google/osv-scanner/releases/download/v1.7.3/osv-scanner_1.7.3_linux_amd64
+          chmod +x osv-scanner_1.7.3_linux_amd64
+          mv osv-scanner_1.7.3_linux_amd64 /usr/local/bin/osv-scanner
+
+      - name: Scanner les dépendances
+        run: osv-scanner --format sarif --output osv.sarif --recursive .
 
       - name: Envoyer le rapport SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: osv-scanner.sarif
+          sarif_file: osv.sarif
 
   DependenciesAnalysis:
     name: Analyse statique Semgrep
@@ -37,7 +41,7 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Lancer Semgrep (Java)
+      - name: Exécuter Semgrep
         run: semgrep --config=p/java --sarif --output=semgrep.sarif
 
       - name: Envoyer le rapport SARIF
