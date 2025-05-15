@@ -2,51 +2,46 @@ name: Daily Security Pipeline
 
 on:
   schedule:
-    - cron: '0 1 * * *'
-  workflow_dispatch:
+    - cron: '0 3 * * *'  # tous les jours à 3h00 UTC
+  workflow_dispatch:      # pour le test manuel
 
 permissions:
-  actions: read
   contents: read
-  security-events: write  # IMPORTANT pour envoyer le SARIF
+  security-events: write
 
 jobs:
 
+  SourceCodeAnalysis:
+    name: Analyse des dépendances (OSV)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Exécuter OSV Scanner
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: '.'
+
+      - name: Envoyer le rapport SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: osv-scanner.sarif
+
   DependenciesAnalysis:
-    name: Analyse Semgrep (Java)
+    name: Analyse statique Semgrep
     runs-on: ubuntu-latest
     container:
       image: returntocorp/semgrep
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout du code
+        uses: actions/checkout@v4
 
-      - name: Run Semgrep
-        run: semgrep --config=p/java --sarif --output=semgrep-report.sarif
+      - name: Lancer Semgrep (Java)
+        run: semgrep --config=p/java --sarif --output=semgrep.sarif
 
-      - name: Upload SARIF report
+      - name: Envoyer le rapport SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: semgrep-report.sarif
-
-  SourceCodeAnalysis:
-    name: Analyse OSV Scanner
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Install OSV Scanner
-        run: |
-          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner-linux-amd64 -o osv-scanner
-          chmod +x osv-scanner
-          sudo mv osv-scanner /usr/local/bin/
-
-      - name: Run OSV Scanner
-        run: osv-scanner --lockfile=**/package-lock.json --output osv-report.sarif || true
-
-      - name: Upload SARIF report
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: osv-report.sarif
+          sarif_file: semgrep.sarif
 
