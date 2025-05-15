@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: read
-  security-events: write  # Nécessaire pour publier les rapports SARIF
+  security-events: write  # Requis pour publier SARIF
 
 jobs:
   DependenciesAnalysis:
@@ -36,13 +36,17 @@ jobs:
 
       - name: Télécharger OSV-Scanner
         run: |
-          curl -sSfL https://github.com/google/osv-scanner/releases/download/v2.0.2/osv-scanner_linux_amd64 -o osv-scanner
+          curl -sSfL https://github.com/google/osv-scanner/releases/download/v1.7.3/osv-scanner_1.7.3_linux_amd64.tar.gz -o osv-scanner.tar.gz
+          tar -xzf osv-scanner.tar.gz
           chmod +x osv-scanner
           sudo mv osv-scanner /usr/local/bin/
 
       - name: Lancer OSV-Scanner
         run: |
-          osv-scanner --format sarif --output osv-report.sarif || echo "OSV scan terminé"
+          osv-scanner --recursive . --format sarif --output osv-report.sarif || echo "OSV scan terminé"
+
+      - name: Vérification présence SARIF
+        run: ls -l osv-report.sarif || echo "SARIF non généré"
 
       - name: Envoyer le rapport SARIF
         uses: github/codeql-action/upload-sarif@v3
