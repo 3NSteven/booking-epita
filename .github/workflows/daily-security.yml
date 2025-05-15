@@ -15,14 +15,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run OSV Scanner
-        uses: google/osv-scanner-action@main
-        with:
-          scan-directory: .
+        run: |
+          curl -LO https://github.com/google/osv-scanner/releases/latest/download/osv-scanner-linux-amd64
+    chmod +x osv-scanner-linux-amd64
+    ./osv-scanner-linux-amd64 --format sarif --output osv.sarif --recursive .
 
-      - name: Upload OSV Scanner report (SARIF)
+      - name: Upload OSV SARIF report
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: osv.sarif
+
 
       - name: Run Semgrep in Docker
         uses: docker://returntocorp/semgrep
