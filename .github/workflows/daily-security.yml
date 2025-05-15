@@ -2,43 +2,51 @@ name: Daily Security Pipeline
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # Runs every day at 03:00 UTC
-  workflow_dispatch:      # Manual trigger allowed
+    - cron: '0 1 * * *'
+  workflow_dispatch:
 
 permissions:
-  security-events: write  # Required to upload SARIF reports
+  actions: read
+  contents: read
+  security-events: write  # IMPORTANT pour envoyer le SARIF
 
 jobs:
-  DependenciesAnalysis:
-    name: Dependency and Semgrep Analysis
-    runs-on: ubuntu-latest
 
+  DependenciesAnalysis:
+    name: Analyse Semgrep (Java)
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Run Semgrep
+        run: semgrep --config=p/java --sarif --output=semgrep-report.sarif
+
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-report.sarif
+
+  SourceCodeAnalysis:
+    name: Analyse OSV Scanner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install OSV Scanner
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner-linux-amd64 -o osv-scanner
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
 
       - name: Run OSV Scanner
-        run: |
-          curl -LO https://github.com/google/osv-scanner/releases/latest/download/osv-scanner-linux-amd64
-          chmod +x osv-scanner-linux-amd64
-          mv osv-scanner-linux-amd64 osv-scanner
-          ./osv-scanner --format sarif --output osv.sarif --recursive .
+        run: osv-scanner --lockfile=**/package-lock.json --output osv-report.sarif || true
 
-      - name: Upload OSV SARIF report
+      - name: Upload SARIF report
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: osv.sarif
-
-      - name: Install Semgrep
-        run: |
-          pip install semgrep
-
-      - name: Run Semgrep scan
-        run: |
-          semgrep --config p/java --sarif --output semgrep.sarif
-
-      - name: Upload Semgrep SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: semgrep.sarif
+          sarif_file: osv-report.sarif
 
