@@ -2,17 +2,27 @@ name: Daily Security Pipeline
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Tous les jours à minuit
+    - cron: '0 0 * * *'  # Chaque jour à minuit
   workflow_dispatch:
 
 jobs:
   dependencies-analysis:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v1
+      - name: Set up Go (required for osv-scanner)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.20'
+
+      - name: Install osv-scanner
+        run: go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+
+      - name: Run osv-scanner on dependencies
+        run: |
+          ~/go/bin/osv-scanner --lockfile=app/gradle.lockfile --format sarif > osv.sarif
 
       - name: Upload SARIF report
         uses: github/codeql-action/upload-sarif@v2
