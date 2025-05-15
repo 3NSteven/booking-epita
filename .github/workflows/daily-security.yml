@@ -5,6 +5,9 @@ on:
     - cron: '0 3 * * *'  # runs daily at 03:00 UTC
   workflow_dispatch:     # allows manual triggering
 
+permissions:
+  security-events: write  # autorise l'envoi vers le Security Dashboard
+
 jobs:
   DependenciesAnalysis:
     name: Dependency and Semgrep Analysis
@@ -14,33 +17,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run OSV Scanner
+      - name: Install and run OSV Scanner
         run: |
           curl -LO https://github.com/google/osv-scanner/releases/latest/download/osv-scanner-linux-amd64
-    chmod +x osv-scanner-linux-amd64
-    ./osv-scanner-linux-amd64 --format sarif --output osv.sarif --recursive .
+          chmod +x osv-scanner-linux-amd64
+          mv osv-scanner-linux-amd64 osv-scanner
+          ./osv-scanner --format sarif --output osv.sarif --recursive .
 
       - name: Upload OSV SARIF report
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: osv.sarif
 
+      - name: Install Semgrep
+        run: |
+          pip install semgrep
 
-      - name: Run Semgrep in Docker
-        uses: docker://returntocorp/semgrep
-        with:
-          args: semgrep --config p/java --sarif --output semgrep.sarif
+      - name: Run Semgrep scan
+        run: |
+          semgrep --config p/java --sarif --output semgrep.sarif
 
       - name: Upload Semgrep SARIF
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: semgrep.sarif
-
-  SourceCodeAnalysis:
-    name: Source Code Analysis
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
