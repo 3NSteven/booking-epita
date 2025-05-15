@@ -36,7 +36,7 @@ jobs:
 
       - name: Télécharger OSV-Scanner
         run: |
-          curl -sSfL https://github.com/google/osv-scanner/releases/download/v2.0.2/osv-scanner_darwin_amd64
+          curl -sSfL https://github.com/google/osv-scanner/releases/download/v2.0.2/osv-scanner_darwin_amd64 -o osv-scanner
           chmod +x osv-scanner
           sudo mv osv-scanner /usr/local/bin/
 
