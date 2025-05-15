@@ -14,3 +14,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-directory: '.'  # Scan current directory; adjust as needed
+
